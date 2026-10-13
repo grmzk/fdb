@@ -21,24 +21,22 @@
 #
 # See LICENSE.TXT for details.
 
-import sys
-import os
 import ctypes
-import struct
-import time
 import datetime
 import decimal
-import weakref
+import os
+import struct
+import sys
 import threading
+import time
+import weakref
+
 try:
     from builtins import dict
 except ImportError:
     from __builtin__ import dict
 
-from . import ibase
-from . import schema
-from . import monitor
-from . import utils
+from . import ibase, monitor, schema, utils
 
 try:
     # Python 2
@@ -46,112 +44,90 @@ try:
 except ImportError:
     # Python 3
     from itertools import zip_longest as izip_longest
-from fdb.ibase import (frb_info_att_charset, isc_dpb_activate_shadow,
-                       isc_dpb_address_path, isc_dpb_allocation, isc_dpb_begin_log,
-                       isc_dpb_buffer_length, isc_dpb_cache_manager, isc_dpb_cdd_pathname,
-                       isc_dpb_connect_timeout, isc_dpb_damaged, isc_dpb_dbkey_scope,
-                       isc_dpb_debug, isc_dpb_delete_shadow,
-                       isc_dpb_dummy_packet_interval,
-                       isc_dpb_encrypt_key, isc_dpb_force_write, isc_dpb_garbage_collect,
-                       isc_dpb_gbak_attach, isc_dpb_gfix_attach, isc_dpb_gsec_attach,
-                       isc_dpb_gstat_attach, isc_dpb_interp,
-                       isc_dpb_lc_ctype, isc_dpb_lc_messages,
-                       isc_dpb_no_garbage_collect, isc_dpb_no_reserve,
-                       isc_dpb_num_buffers, isc_dpb_number_of_users, isc_dpb_old_dump_id,
-                       isc_dpb_old_file, isc_dpb_old_file_size, isc_dpb_old_num_files,
-                       isc_dpb_old_start_file, isc_dpb_old_start_page,
-                       isc_dpb_old_start_seqno, isc_dpb_online, isc_dpb_online_dump,
-                       isc_dpb_overwrite, isc_dpb_page_size, isc_dpb_password,
-                       isc_dpb_password_enc, isc_dpb_reserved,
-                       isc_dpb_sec_attach, isc_dpb_set_db_charset,
-                       isc_dpb_set_db_readonly, isc_dpb_set_db_sql_dialect,
-                       isc_dpb_set_page_buffers, isc_dpb_shutdown, isc_dpb_shutdown_delay,
-                       isc_dpb_sql_dialect, isc_dpb_sql_role_name, isc_dpb_sweep,
-                       isc_dpb_sweep_interval, isc_dpb_sys_user_name,
-                       isc_dpb_sys_user_name_enc, isc_dpb_trace, isc_dpb_user_name,
-                       isc_dpb_verify, isc_dpb_version1,
-                       isc_dpb_working_directory, isc_dpb_no_db_triggers, isc_dpb_trusted_auth,
-                       isc_dpb_trusted_role, isc_dpb_utf8_filename,
-                       isc_dpb_auth_plugin_list, isc_dpb_auth_plugin_name, isc_dpb_specific_auth_data, isc_dpb_nolinger,
-                       isc_info_active_tran_count, isc_info_end, isc_info_truncated,
-                       isc_info_sql_stmt_type, isc_info_sql_get_plan, isc_info_sql_records,
-                       isc_info_req_select_count, isc_info_req_insert_count,
-                       isc_info_req_update_count, isc_info_req_delete_count,
-                       isc_info_blob_total_length, isc_info_blob_max_segment,
-                       isc_info_blob_type, isc_info_blob_num_segments,
-                       fb_info_page_contents,
-                       isc_info_active_transactions, isc_info_allocation,
-                       isc_info_attachment_id, isc_info_backout_count,
-                       isc_info_base_level, isc_info_bpage_errors, isc_info_creation_date,
-                       isc_info_current_memory,
-                       isc_info_db_class, isc_info_db_id, isc_info_db_provider,
-                       isc_info_db_read_only, isc_info_db_size_in_pages,
-                       isc_info_db_sql_dialect, isc_info_delete_count,
-                       isc_info_dpage_errors, isc_info_expunge_count, isc_info_fetches,
-                       isc_info_firebird_version, isc_info_forced_writes,
-                       isc_info_implementation, isc_info_insert_count,
-                       isc_info_ipage_errors, isc_info_isc_version,
-                       isc_info_limbo, isc_info_marks, isc_info_max_memory,
-                       isc_info_next_transaction, isc_info_no_reserve, isc_info_num_buffers,
-                       isc_info_ods_minor_version, isc_info_ods_version, isc_info_oldest_active,
-                       isc_info_oldest_snapshot, isc_info_oldest_transaction,
-                       isc_info_page_errors, isc_info_page_size, isc_info_ppage_errors,
-                       isc_info_purge_count, isc_info_read_idx_count,
-                       isc_info_read_seq_count, isc_info_reads, isc_info_record_errors,
-                       isc_info_set_page_buffers, isc_info_sql_stmt_commit,
-                       isc_info_sql_stmt_ddl, isc_info_sql_stmt_delete,
-                       isc_info_sql_stmt_exec_procedure, isc_info_sql_stmt_get_segment,
-                       isc_info_sql_stmt_insert, isc_info_sql_stmt_put_segment,
-                       isc_info_sql_stmt_rollback, isc_info_sql_stmt_savepoint,
-                       isc_info_sql_stmt_select, isc_info_sql_stmt_select_for_upd,
-                       isc_info_sql_stmt_set_generator, isc_info_sql_stmt_start_trans,
-                       isc_info_sql_stmt_update, isc_info_sweep_interval,
-                       isc_info_tpage_errors, isc_info_tra_access,
-                       isc_info_tra_concurrency, isc_info_tra_consistency,
-                       isc_info_tra_id, isc_info_tra_isolation, isc_info_tra_lock_timeout,
-                       isc_info_tra_no_rec_version, isc_info_tra_oldest_active,
-                       isc_info_tra_oldest_interesting, isc_info_tra_oldest_snapshot,
-                       isc_info_tra_read_committed, isc_info_tra_readonly,
-                       isc_info_tra_readwrite, isc_info_tra_rec_version, fb_info_tra_dbpath,
-                       isc_info_update_count, isc_info_user_names, isc_info_version,
-                       isc_info_writes, isc_tpb_autocommit,
-                       # FB 3
-                       isc_dpb_version2,
-                       fb_info_implementation, fb_info_page_warns, fb_info_record_warns,
-                       fb_info_bpage_warns, fb_info_dpage_warns, fb_info_ipage_warns,
-                       fb_info_ppage_warns, fb_info_tpage_warns, fb_info_pip_errors, fb_info_pip_warns,
-                       #
-                       isc_tpb_commit_time, isc_tpb_concurrency, isc_tpb_consistency,
-                       isc_tpb_exclusive, isc_tpb_ignore_limbo, isc_tpb_lock_read,
-                       isc_tpb_lock_timeout, isc_tpb_lock_write, isc_tpb_no_auto_undo,
-                       isc_tpb_no_rec_version, isc_tpb_nowait, isc_tpb_protected,
-                       isc_tpb_read, isc_tpb_read_committed, isc_tpb_rec_version,
-                       isc_tpb_restart_requests, isc_tpb_shared, isc_tpb_verb_time,
-                       isc_tpb_version3, isc_tpb_wait, isc_tpb_write,
-                       #
-                       b, s, ord2, int2byte, mychr, mybytes, myunicode, mylong, StringType,
-                       IntType, LongType, FloatType, ListType, UnicodeType, TupleType, xrange,
-                       charset_map,
-                       #isc_sqlcode, isc_sql_interprete, fb_interpret, isc_dsql_execute_immediate,
-                       XSQLDA_PTR, ISC_SHORT, ISC_LONG, ISC_SCHAR, ISC_UCHAR, ISC_QUAD,
-                       ISC_DATE, ISC_TIME,
-                       SHRT_MIN, SHRT_MAX, USHRT_MAX, INT_MIN, INT_MAX, LONG_MIN, LONG_MAX,
-                       #
-                       SQL_TEXT, SQL_VARYING, SQL_SHORT, SQL_LONG, SQL_FLOAT, SQL_DOUBLE,
-                       SQL_D_FLOAT, SQL_TIMESTAMP, SQL_BLOB, SQL_ARRAY, SQL_QUAD, SQL_TYPE_TIME,
-                       SQL_TYPE_DATE, SQL_INT64, SQL_BOOLEAN, SUBTYPE_NUMERIC, SUBTYPE_DECIMAL,
-                       MAX_BLOB_SEGMENT_SIZE, ISC_INT64,
-                       #
-                       XSQLVAR, ISC_TEB, RESULT_VECTOR, ISC_STATUS, ISC_STATUS_ARRAY,
-                       ISC_STATUS_PTR, ISC_EVENT_CALLBACK, ISC_ARRAY_DESC,
-                       #
-                       blr_varying, blr_varying2, blr_text, blr_text2, blr_short, blr_long,
-                       blr_int64, blr_float, blr_d_float, blr_double, blr_timestamp, blr_sql_date,
-                       blr_sql_time, blr_cstring, blr_quad, blr_blob, blr_bool,
-                       #
-                       SQLDA_version1, isc_segment,
-                       isc_db_handle, isc_tr_handle, isc_stmt_handle, isc_blob_handle,
-                       sys_encoding)
+
+from fdb.ibase import (  # FB 3; isc_sqlcode, isc_sql_interprete, fb_interpret, isc_dsql_execute_immediate,
+    INT_MAX, INT_MIN, ISC_ARRAY_DESC, ISC_DATE, ISC_EVENT_CALLBACK, ISC_INT64,
+    ISC_LONG, ISC_QUAD, ISC_SCHAR, ISC_SHORT, ISC_STATUS, ISC_STATUS_ARRAY,
+    ISC_STATUS_PTR, ISC_TEB, ISC_TIME, ISC_UCHAR, LONG_MAX, LONG_MIN,
+    MAX_BLOB_SEGMENT_SIZE, RESULT_VECTOR, SHRT_MAX, SHRT_MIN, SQL_ARRAY,
+    SQL_BLOB, SQL_BOOLEAN, SQL_D_FLOAT, SQL_DOUBLE, SQL_FLOAT, SQL_INT64,
+    SQL_LONG, SQL_QUAD, SQL_SHORT, SQL_TEXT, SQL_TIMESTAMP, SQL_TYPE_DATE,
+    SQL_TYPE_TIME, SQL_VARYING, SUBTYPE_DECIMAL, SUBTYPE_NUMERIC, USHRT_MAX,
+    XSQLDA_PTR, XSQLVAR, FloatType, IntType, ListType, LongType,
+    SQLDA_version1, StringType, TupleType, UnicodeType, b, blr_blob, blr_bool,
+    blr_cstring, blr_d_float, blr_double, blr_float, blr_int64, blr_long,
+    blr_quad, blr_short, blr_sql_date, blr_sql_time, blr_text, blr_text2,
+    blr_timestamp, blr_varying, blr_varying2, charset_map, fb_info_bpage_warns,
+    fb_info_dpage_warns, fb_info_implementation, fb_info_ipage_warns,
+    fb_info_page_contents, fb_info_page_warns, fb_info_pip_errors,
+    fb_info_pip_warns, fb_info_ppage_warns, fb_info_record_warns,
+    fb_info_tpage_warns, fb_info_tra_dbpath, frb_info_att_charset, int2byte,
+    isc_blob_handle, isc_db_handle, isc_dpb_activate_shadow,
+    isc_dpb_address_path, isc_dpb_allocation, isc_dpb_auth_plugin_list,
+    isc_dpb_auth_plugin_name, isc_dpb_begin_log, isc_dpb_buffer_length,
+    isc_dpb_cache_manager, isc_dpb_cdd_pathname, isc_dpb_connect_timeout,
+    isc_dpb_damaged, isc_dpb_dbkey_scope, isc_dpb_debug, isc_dpb_delete_shadow,
+    isc_dpb_dummy_packet_interval, isc_dpb_encrypt_key, isc_dpb_force_write,
+    isc_dpb_garbage_collect, isc_dpb_gbak_attach, isc_dpb_gfix_attach,
+    isc_dpb_gsec_attach, isc_dpb_gstat_attach, isc_dpb_interp,
+    isc_dpb_lc_ctype, isc_dpb_lc_messages, isc_dpb_no_db_triggers,
+    isc_dpb_no_garbage_collect, isc_dpb_no_reserve, isc_dpb_nolinger,
+    isc_dpb_num_buffers, isc_dpb_number_of_users, isc_dpb_old_dump_id,
+    isc_dpb_old_file, isc_dpb_old_file_size, isc_dpb_old_num_files,
+    isc_dpb_old_start_file, isc_dpb_old_start_page, isc_dpb_old_start_seqno,
+    isc_dpb_online, isc_dpb_online_dump, isc_dpb_overwrite, isc_dpb_page_size,
+    isc_dpb_password, isc_dpb_password_enc, isc_dpb_reserved,
+    isc_dpb_sec_attach, isc_dpb_set_db_charset, isc_dpb_set_db_readonly,
+    isc_dpb_set_db_sql_dialect, isc_dpb_set_page_buffers, isc_dpb_shutdown,
+    isc_dpb_shutdown_delay, isc_dpb_specific_auth_data, isc_dpb_sql_dialect,
+    isc_dpb_sql_role_name, isc_dpb_sweep, isc_dpb_sweep_interval,
+    isc_dpb_sys_user_name, isc_dpb_sys_user_name_enc, isc_dpb_trace,
+    isc_dpb_trusted_auth, isc_dpb_trusted_role, isc_dpb_user_name,
+    isc_dpb_utf8_filename, isc_dpb_verify, isc_dpb_version1, isc_dpb_version2,
+    isc_dpb_working_directory, isc_info_active_tran_count,
+    isc_info_active_transactions, isc_info_allocation, isc_info_attachment_id,
+    isc_info_backout_count, isc_info_base_level, isc_info_blob_max_segment,
+    isc_info_blob_num_segments, isc_info_blob_total_length, isc_info_blob_type,
+    isc_info_bpage_errors, isc_info_creation_date, isc_info_current_memory,
+    isc_info_db_class, isc_info_db_id, isc_info_db_provider,
+    isc_info_db_read_only, isc_info_db_size_in_pages, isc_info_db_sql_dialect,
+    isc_info_delete_count, isc_info_dpage_errors, isc_info_end,
+    isc_info_expunge_count, isc_info_fetches, isc_info_firebird_version,
+    isc_info_forced_writes, isc_info_implementation, isc_info_insert_count,
+    isc_info_ipage_errors, isc_info_isc_version, isc_info_limbo,
+    isc_info_marks, isc_info_max_memory, isc_info_next_transaction,
+    isc_info_no_reserve, isc_info_num_buffers, isc_info_ods_minor_version,
+    isc_info_ods_version, isc_info_oldest_active, isc_info_oldest_snapshot,
+    isc_info_oldest_transaction, isc_info_page_errors, isc_info_page_size,
+    isc_info_ppage_errors, isc_info_purge_count, isc_info_read_idx_count,
+    isc_info_read_seq_count, isc_info_reads, isc_info_record_errors,
+    isc_info_req_delete_count, isc_info_req_insert_count,
+    isc_info_req_select_count, isc_info_req_update_count,
+    isc_info_set_page_buffers, isc_info_sql_get_plan, isc_info_sql_records,
+    isc_info_sql_stmt_commit, isc_info_sql_stmt_ddl, isc_info_sql_stmt_delete,
+    isc_info_sql_stmt_exec_procedure, isc_info_sql_stmt_get_segment,
+    isc_info_sql_stmt_insert, isc_info_sql_stmt_put_segment,
+    isc_info_sql_stmt_rollback, isc_info_sql_stmt_savepoint,
+    isc_info_sql_stmt_select, isc_info_sql_stmt_select_for_upd,
+    isc_info_sql_stmt_set_generator, isc_info_sql_stmt_start_trans,
+    isc_info_sql_stmt_type, isc_info_sql_stmt_update, isc_info_sweep_interval,
+    isc_info_tpage_errors, isc_info_tra_access, isc_info_tra_concurrency,
+    isc_info_tra_consistency, isc_info_tra_id, isc_info_tra_isolation,
+    isc_info_tra_lock_timeout, isc_info_tra_no_rec_version,
+    isc_info_tra_oldest_active, isc_info_tra_oldest_interesting,
+    isc_info_tra_oldest_snapshot, isc_info_tra_read_committed,
+    isc_info_tra_readonly, isc_info_tra_readwrite, isc_info_tra_rec_version,
+    isc_info_truncated, isc_info_update_count, isc_info_user_names,
+    isc_info_version, isc_info_writes, isc_segment, isc_stmt_handle,
+    isc_tpb_autocommit, isc_tpb_commit_time, isc_tpb_concurrency,
+    isc_tpb_consistency, isc_tpb_exclusive, isc_tpb_ignore_limbo,
+    isc_tpb_lock_read, isc_tpb_lock_timeout, isc_tpb_lock_write,
+    isc_tpb_no_auto_undo, isc_tpb_no_rec_version, isc_tpb_nowait,
+    isc_tpb_protected, isc_tpb_read, isc_tpb_read_committed,
+    isc_tpb_rec_version, isc_tpb_restart_requests, isc_tpb_shared,
+    isc_tpb_verb_time, isc_tpb_version3, isc_tpb_wait, isc_tpb_write,
+    isc_tr_handle, mybytes, mychr, mylong, myunicode, ord2, s, sys_encoding,
+    xrange)
 
 PYTHON_MAJOR_VER = sys.version_info[0]
 
@@ -1112,7 +1088,13 @@ class Connection(object):
         self.__ic = self.query_transaction.cursor()
         self.__ic._set_as_internal()
         # Get Firebird engine version
-        verstr = self.db_info(isc_info_firebird_version)
+        try:
+            verstr = self.db_info(isc_info_firebird_version)
+        except InternalError as e:
+            if str(e) == "Result code does not match request code.":
+                verstr = self.db_info(isc_info_version)
+            else:
+                raise
         x = verstr.split()
         if x[0].find('V') > 0:
             (x, self.__version) = x[0].split('V')
